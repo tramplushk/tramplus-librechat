@@ -1,10 +1,13 @@
 const {
   Capabilities,
   EModelEndpoint,
+  isAgentsEndpoint,
+  AgentCapabilities,
   isAssistantsEndpoint,
   defaultRetrievalModels,
   defaultAssistantsVersion,
 } = require('librechat-data-provider');
+const { Providers } = require('@librechat/agents');
 const { getCitations, citeText } = require('./citations');
 const partialRight = require('lodash/partialRight');
 const { sendMessage } = require('./streamResponse');
@@ -160,8 +163,8 @@ const isUserProvided = (value) => value === 'user_provided';
 /**
  * Generate the configuration for a given key and base URL.
  * @param {string} key
- * @param {string} baseURL
- * @param {string} endpoint
+ * @param {string} [baseURL]
+ * @param {string} [endpoint]
  * @returns {boolean | { userProvide: boolean, userProvideURL?: boolean }}
  */
 function generateConfig(key, baseURL, endpoint) {
@@ -177,7 +180,7 @@ function generateConfig(key, baseURL, endpoint) {
   }
 
   const assistants = isAssistantsEndpoint(endpoint);
-
+  const agents = isAgentsEndpoint(endpoint);
   if (assistants) {
     config.retrievalModels = defaultRetrievalModels;
     config.capabilities = [
@@ -189,6 +192,18 @@ function generateConfig(key, baseURL, endpoint) {
     ];
   }
 
+  if (agents) {
+    config.capabilities = [
+      AgentCapabilities.file_search,
+      AgentCapabilities.actions,
+      AgentCapabilities.tools,
+    ];
+
+    if (key === 'EXPERIMENTAL_RUN_CODE') {
+      config.capabilities.push(AgentCapabilities.execute_code);
+    }
+  }
+
   if (assistants && endpoint === EModelEndpoint.azureAssistants) {
     config.version = defaultAssistantsVersion.azureAssistants;
   } else if (assistants) {
@@ -198,13 +213,23 @@ function generateConfig(key, baseURL, endpoint) {
   return config;
 }
 
+/**
+ * Normalize the endpoint name to system-expected value.
+ * @param {string} name
+ * @returns {string}
+ */
+function normalizeEndpointName(name = '') {
+  return name.toLowerCase() === Providers.OLLAMA ? Providers.OLLAMA : name;
+}
+
 module.exports = {
-  createOnProgress,
   isEnabled,
   handleText,
   formatSteps,
   formatAction,
-  addSpaceIfNeeded,
   isUserProvided,
   generateConfig,
+  addSpaceIfNeeded,
+  createOnProgress,
+  normalizeEndpointName,
 };
